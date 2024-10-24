@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <fstream> // Add this line at the top of your Server.cpp
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cstring>
@@ -28,22 +29,37 @@ bool Server::createSocket() {
     return true;
 }
 
-bool Server::bindSocket() {
-    address.sin_family = AF_INET;
-    address.sin_port = htons(port);
+// bool Server::bindSocket() {
+//     address.sin_family = AF_INET;
+//     address.sin_port = htons(port);
 
-    if (inet_pton(AF_INET, hostname.c_str(), &address.sin_addr) <= 0) {
-        std::cerr << "Error: Invalid address/ Address not supported." << std::endl;
-        return false;
-    }
+//     if (inet_pton(AF_INET, hostname.c_str(), &address.sin_addr) <= 0) {
+//         std::cerr << "Error: Invalid address/ Address not supported." << std::endl;
+//         return false;
+//     }
+
+//     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+//         std::cerr << "Error: Failed to bind socket. Errno: " << strerror(errno) << std::endl;
+//         return false;
+//     }
+
+//     return true;
+// }
+
+// Example: Server class method for binding
+bool Server::bindSocket() {
+    address.sin_family = AF_INET; // IPv4
+    address.sin_addr.s_addr = inet_addr(hostname.c_str()); // Use the hostname from config
+    address.sin_port = htons(port); // Set the port
 
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "Error: Failed to bind socket. Errno: " << strerror(errno) << std::endl;
+        perror("bind failed");
         return false;
     }
-
     return true;
 }
+
+
 
 bool Server::makeNonBlocking() {
     int flags = fcntl(server_fd, F_GETFL, 0);
@@ -138,4 +154,69 @@ void Server::handleClient(int client_fd) {
         }
     }
 }
+
+std::string Server::getFilePath(const std::string& request_path) {
+    std::string base_directory = "./www";  // Define the base directory for static files
+    std::string file_path = base_directory + request_path;
+
+    // If request is for a directory, append index.html or another default file
+    if (file_path.back() == '/') {
+        file_path += "index.html"; // Default file
+    }
+
+    return file_path;
+}
+
+void Server::serveFile(int client_fd, const std::string& file_path) {
+    // Open the file
+    std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
+    if (!file.is_open()) {
+        send404(client_fd);  // File not found, send a 404 response
+        return;
+    }
+
+    // Read file contents into a string
+    std::string file_content((std::istreambuf_iterator<char>(file)),
+                              std::istreambuf_iterator<char>());
+    file.close();
+
+    // Determine the content type based on file extension
+    std::string content_type = getContentType(file_path);
+
+    // Send HTTP response headers
+    std::string http_response =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: " + content_type + "\r\n"
+        "Content-Length: " + std::to_string(file_content.size()) + "\r\n"
+        "\r\n";
+    
+    // Send the headers and the file content
+    send(client_fd, http_response.c_str(), http_response.size(), 0);
+    send(client_fd, file_content.c_str(), file_content.size(), 0);
+}
+
+std::string Server::getContentType(const std::string& file_path) {
+    // Check the file extension manually instead of using ends_with
+    if (file_path.substr(file_path.size() - 5) == ".html") return "text/html";
+    if (file_path.substr(file_path.size() - 4) == ".css") return "text/css";
+    if (file_path.substr(file_path.size() - 3) == ".js") return "application/javascript";
+    if (file_path.substr(file_path.size() - 4) == ".jpg" || file_path.substr(file_path.size() - 5) == ".jpeg") return "image/jpeg";
+    if (file_path.substr(file_path.size() - 4) == ".png") return "image/png";
+    if (file_path.substr(file_path.size() - 4) == ".gif") return "image/gif";
+
+    return "application/octet-stream"; // Default content type
+}
+
+
+void Server::send404(int client_fd) {
+    std::string http_response =
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: 13\r\n"
+        "\r\n"
+        "404 Not Found";
+    
+    send(client_fd, http_response.c_str(), http_response.size(), 0);
+}
+
 
