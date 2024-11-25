@@ -33,6 +33,7 @@ private:
     std::vector <std::string> all_hostname;
     std::vector <sockaddr_in> all_sock_addr;
     std::map<int, Request> Reqmap;
+    std::map<int, std::map<int, std::string> > err_pages;
     std::map<int, time_t> TimeOutMap;
 
 
@@ -54,6 +55,7 @@ private:
     void acceptConnections();
     void add_client_to_poll(int client_fd);
     void initializePollFds();
+    const std::string find_err_path(int serv_fd, int err_code);
 };
 
 #endif // SERVER_HPP

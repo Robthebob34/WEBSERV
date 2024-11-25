@@ -32,5 +32,13 @@
 #include "Server.hpp"
 #include "Request.hpp"
 
+//utils.cpp
+#include <iostream>
+#include <sstream> // Add this header
+#include <string>  // If you are using std::string
+#include <iostream> // If you are using std::cout or similar features
+
+std::string myItoa(int to_translate);
+
 
 #endif

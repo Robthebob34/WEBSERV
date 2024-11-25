@@ -4,12 +4,14 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include "Webserv.hpp"
 
 struct ServerConfig {
     int port;
     std::string hostname;
     std::string root;
     std::string index;
+    std::map <int, std::string> error_pages;
 };
 
 class Config {
@@ -21,6 +23,7 @@ public:
     const std::vector<ServerConfig>& getServers() const; // New getter for server configurations
 
 private:
+
     std::vector<ServerConfig> servers; // Store multiple server configurations
 
     // Helper functions
@@ -31,6 +34,7 @@ private:
     std::string extractServerName(const std::string& line); // New method to extract server name
     std::string extractRoot(const std::string& line); // New method to extract root
     std::string extractIndex(const std::string& line); // New method to extract index
+    std::map <int, std::string> extractErrPages(const std::string &line);
 };
 
 #endif

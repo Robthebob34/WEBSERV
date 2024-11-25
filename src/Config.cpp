@@ -1,4 +1,5 @@
 #include "../include/Config.hpp"
+#include "../include/Webserv.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -7,6 +8,22 @@
 Config::Config() {}
 
 Config::~Config() {}
+
+std::map <int, std::string> Config::extractErrPages(const std::string &line)
+{
+    std::map <int, std::string> node;
+    std::istringstream iss(line);
+    std::string token;
+    std::string err_path;
+    int err_code;
+
+
+    iss >> token; // skip error_page 
+    iss >> err_code >> err_path;
+    std::cout << "err_code = " << err_code << " err_path = " << err_path << std::endl;
+    node[err_code] = err_path;
+    return node;
+}
 
 bool Config::parseConfigFile(const std::string& filename) {
     std::ifstream configFile(filename.c_str());
@@ -46,9 +63,11 @@ void Config::parseServerBlock(std::ifstream& file) {
             serverConfig.root = extractRoot(line);
         } else if (line.find("index") == 0) {
             serverConfig.index = extractIndex(line);
+        } else if (line.find("error_pages") == 0) {
+            std::map <int, std::string> err_page = extractErrPages(line);
+            serverConfig.error_pages.insert(err_page.begin(), err_page.end());
         }
     }
-
     servers.push_back(serverConfig);
 }
 

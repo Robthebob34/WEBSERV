@@ -1,5 +1,6 @@
 #include "../include/Server.hpp"
 #include "../include/Cgi.hpp"
+#include "../include/Webserv.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -47,6 +48,21 @@ bool Server::bindSocket() {
     all_sock_addr.push_back(address);
     i++;
     return true;
+}
+
+const std::string Server::find_err_path(int serv_fd, int err_code)
+{
+    if(err_pages.find(serv_fd) != err_pages.end())
+    {
+        if(err_pages[serv_fd].find(err_code) != err_pages[serv_fd].end())
+        {
+            std::cout << "!!!!!" << err_pages[serv_fd][err_code] << std::endl;
+            return(err_pages[serv_fd][err_code]);
+        }
+    }
+    std::string err_path = "./Www/error_pages/error" + myItoa(err_code) + ".html";
+    std::cout << "????" << err_path << std::endl;
+    return(err_path);
 }
 
 void    Server::add_serv(ServerConfig newServ)
@@ -129,7 +145,6 @@ void Server::start() {
 void Server::initializePollFds()
 {
     this->poll_fds.clear(); 
-    //std::cout << "ALL SERV LEN = " << this->all_serv_fd.size() << std::endl;
     for (size_t i = 0; i < this->all_serv_fd.size(); i++)
     {
         pollfd pfd;
@@ -145,20 +160,6 @@ void Server::initializePollFds()
         pfd.events = POLLIN | POLLOUT; // Surveillez les lectures et écritures pour les clients
         pfd.revents = 0;
         poll_fds.push_back(pfd);
-        
-        // Surveillez aussi les canaux pour CGI s'ils sont en état d'écriture/lecture
-        // if (client_entry.second.response.getCgiState() == 1)
-        // {
-        //     pollfd cgi_write;
-        //     cgi_write.fd = client_entry.second.response._cgi_obj.pipe_in[1];
-        //     cgi_write.events = POLLOUT;  // Écriture possible
-        //     poll_fds.push_back(cgi_write);
-
-        //     pollfd cgi_read;
-        //     cgi_read.fd = client_entry.second.response._cgi_obj.pipe_out[0];
-        //     cgi_read.events = POLLIN;  // Lecture possible
-        //     poll_fds.push_back(cgi_read);
-        // }
     }
     biggest_fd = all_serv_fd[all_serv_fd.size() - 1];
 }
@@ -180,7 +181,7 @@ void Server::acceptConnections() {
 
     initializePollFds();
     while (true) {
-        int poll_ret = poll(poll_fds.data(), poll_fds.size(), 300000000);  // Timeout en millisecondes
+        int poll_ret = poll(poll_fds.data(), poll_fds.size(), 3000);  // Timeout en millisecondes
         //Msg::logMsg(RED, CONSOLE_OUTPUT, "poll_ret = %d", poll_ret);
         if (poll_ret < 0)
         {
@@ -219,13 +220,12 @@ void Server::acceptConnections() {
                 if(std::find(all_client_fd.begin(), all_client_fd.end(), fd) != all_client_fd.end())
                 {
                     std::string method = Reqmap[fd].method;
-                    //printf("\nmethod : %s\n", method.c_str());
                     if (method == "GET") {
                         serveFile(fd, Reqmap[fd].FilePath, i);
                     } else if (method == "POST") {
-                        handlePost(fd, Reqmap[fd].request, Reqmap[fd].FilePath, Reqmap[fd].bytes_read, Reqmap[fd].buffer); // New function for handling POST requests
+                        handlePost(fd, Reqmap[fd].request, Reqmap[fd].FilePath, Reqmap[fd].bytes_read, Reqmap[fd].buffer);
                     } else if (method == "DELETE") {
-                        handleDelete(fd, Reqmap[fd].FilePath); // New function for handling DELETE requests
+                        handleDelete(fd, Reqmap[fd].FilePath);
                     }// else
                      //   send404(fd);
                 }
@@ -243,7 +243,7 @@ void Server::acceptConnections() {
 void Server::readrequest(int client_fd, size_t pos) {
 
     (void)pos;
-    char buffer[10000];
+    char buffer[10240];
     memset(buffer, 0, sizeof(buffer));
     ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes_read <= 0) {
@@ -285,7 +285,7 @@ void Server::readrequest(int client_fd, size_t pos) {
 }
 
 std::string Server::getFilePath(const std::string& request_path) {
-    std::string base_directory = "./www";  // Define the base directory for static files
+    std::string base_directory = "./www";
     std::string file_path = base_directory + request_path;
     if (file_path.back() == '/') file_path += "index.html";
     return file_path;
@@ -297,7 +297,6 @@ std::string trim_cgi_param(std::string str)
     else
     {
         int i = str.find('?');
-        //std::cout << "QUERY_ENV = " << str.c_str() + i + 1 << std::endl;
         if(setenv("QUERY_STRING", str.c_str() + i + 1, 1) != 0)
             std::cerr << "Error setenv query_string!" << std::endl;
         return str.substr(0, i);
@@ -345,6 +344,7 @@ void Server::serveFile(int client_fd, const std::string& file_path, size_t pos) 
     }
     else
         TimeOutMap[client_fd] = time(NULL);
+    close_connexion(client_fd, pos);
 }
 
 std::string Server::getContentType(const std::string& file_path) {
@@ -378,7 +378,7 @@ void Server::send404(int client_fd) {
 
 void Server::handlePost(int client_fd, const std::string& request, const std::string& path, size_t request_length, char *buffer)
 {
-    //printf("\nENTERS HERE\n");
+    
     (void) path;
     size_t content_length = 0;
     size_t pos = request.find("Content-Length: ");
@@ -387,12 +387,6 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
         size_t end_pos = request.find("\r\n", pos);
         content_length = std::stoul(request.substr(pos, end_pos - pos));
     }
-
-    // Read the request body
-    //char* body = new char[content_length + 1];
-    //ssize_t bytes_read = recv(client_fd, body, content_length, 0);
-    //printf("bytes read %lu\n", bytes_read);
-    //body[bytes_read] = '\0'; // Null-terminate the string
 
     size_t boundary_start = request.find("boundary=") + 9;
     size_t boundary_end = request.find("C", boundary_start) - 1; // Find the end of the boundary
@@ -409,6 +403,7 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
     start += boundary.length();
     while (start != std::string::npos) {
         size_t end = request.find(boundary, start);
+        printf("Boundary : |%s|\n", boundary.c_str());
         size_t content_disposition_start = request.find("Content-Disposition:", 0);
         if (content_disposition_start == std::string::npos || content_disposition_start >= end) {
             std::cerr << "Error: Content-Disposition not found." << std::endl;
@@ -432,13 +427,12 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
                 sendInvalidUploadResponse(client_fd);
                 return;
             }
-            printf("buffer : |\n%s| \nrequest length : %lu\n file start : %lu content length : %lu \n\n", buffer, request_length ,file_start, content_length);
-            out_file.write(buffer + file_start, request_length - file_start);
-            
-            //out_file.write(body, bytes_read - (boundary.size() + 4));
-            
+            printf("buffer : |%s|\n boundary size : %lu \nrequest length : %lu\n file start : %lu content length : %lu \n\n", buffer, boundary.size(), request_length ,file_start, content_length);
+            std::cout << "buffer cpp :" << buffer  << std::endl;
+            printf("size buffer :%lu\n",strlen(buffer + 1360));
+            out_file.write(buffer + file_start, request_length - file_start - boundary.size());
             out_file.close();
-            
+
             // Respond back to the client
             std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
                                    "File uploaded successfully";
@@ -446,11 +440,8 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
             close_connexion(client_fd, 1);
             return;
         }
-
         start = end;
     }
-
-    // If we reach here, it means we did not find any file part
     sendInvalidUploadResponse(client_fd);
 }
 
@@ -459,12 +450,14 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
 
 void Server::handleDelete(int client_fd, const std::string& file_path) {
     std::string response;
+    printf("file path : |%s|\n", file_path.c_str());
     if (remove(file_path.c_str()) == 0) {
         response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
-                   "<html><body><h2>File deleted successfully</h2></body></html>";
+                   "File deleted successfully";
     } else {
         response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n\r\n"
-                   "<html><body><h2>File not found</h2></body></html>";
+                   "File not found";
     }
     send(client_fd, response.c_str(), response.size(), 0);
+    close_connexion(client_fd, client_fd - all_serv_fd.size());
 }
