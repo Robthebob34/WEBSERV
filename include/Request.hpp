@@ -12,6 +12,7 @@ class Request
         std::string FilePath;
         std::string connexion;
 		ssize_t bytes_read;
+        std::vector<unsigned char> data;
 		char *buffer;
 
         Request(std::string method, std::string request);

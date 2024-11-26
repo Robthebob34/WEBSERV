@@ -45,7 +45,7 @@ private:
     void serveFile(int client_fd, const std::string& file_path, size_t pos); // Serves the requested file
     std::string getContentType(const std::string& file_path); // Gets the content type based on the file extension
     void send404(int client_fd); // Sends a 404 Not Found response
-    void handlePost(int client_fd, const std::string& request, const std::string& path, size_t bytes_read, char *buffer);
+    void handlePost(int client_fd, const std::string& request, const std::string& path, size_t bytes_read, std::vector<unsigned char> data);
     void handleDelete(int client_fd, const std::string& file_path);
     void sendInvalidUploadResponse(int client_fd);
     // Existing methods
@@ -56,6 +56,8 @@ private:
     void add_client_to_poll(int client_fd);
     void initializePollFds();
     const std::string find_err_path(int serv_fd, int err_code);
+    std::vector<unsigned char> receiveData(int sockfd);
+    
 };
 
 #endif // SERVER_HPP
