@@ -443,18 +443,39 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
             // Get the file content
             size_t file_start = content_disposition_end + 4; // Skip "\r\n"
             std::string file_path = "./uploads/" +  file_name; // Adjust path as necessary
-            std::ofstream out_file(file_path, std::ios::binary);
-            if (!out_file) {
-                std::cerr << "Error: Unable to open file for writing." << std::endl;
-                sendInvalidUploadResponse(client_fd);
-                return;
-            }
+            //std::ofstream out_file(file_path, std::ios::binary);
+           int f = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            printf("valeur open :%d\n", f);
+            // if (!out_file) {
+            //     std::cerr << "Error: Unable to open file for writing." << std::endl;
+            //     sendInvalidUploadResponse(client_fd);
+            //     return;
+            // }
            // printf("buffer : |%s|\n boundary size : %lu \nrequest length : %lu\n file start : %lu content length : %lu \n\n", buffer, boundary.size(), request_length ,file_start, content_length);
             //std::cout << "buffer cpp :" << buffer  << std::endl;
            // printf("size buffer :%lu\n",strlen(buffer + 1360));
             //out_file.write(buffer + file_start, request_length - file_start - boundary.size());
-            out_file.write(reinterpret_cast<const char*>(&data[file_start]), request_length - file_start - boundary.size());
-            out_file.close();
+            (void) data;
+            (void) request_length;
+            printf("size %lu\n", request.size());
+            printf("data . size : %lu", data.size());
+            printf("file start : %lu", file_start);
+             if (file_start >= data.size()) {
+                std::cerr << "Invalid file_start index." << std::endl;
+                    return;
+             }
+             data[data.size() -1] = 0;
+            printf("CAST :%s\n", reinterpret_cast<unsigned char*>(&data[file_start]));
+            unsigned char *l = reinterpret_cast<unsigned char*>(&data[file_start]);
+            //out_file.write(request.c_str(), request_length - file_start - boundary.size());
+            //write(f, request.c_str()[],request.size());
+             //write(f, "123456789098",12);
+            printf("content lengthj %lu\n", content_length);
+            for (size_t i = 0; i < data.size() - file_start - (boundary.size() + 4); i++)
+                write(f, &l[i], 1);
+
+            //write(f,l, request_length - file_start - boundary.size());
+            //out_file.close();
 
             // Respond back to the client
             std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
