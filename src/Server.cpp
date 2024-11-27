@@ -97,13 +97,13 @@ void    Server::close_connexion(int client_fd, size_t pos)
         printf("3\n");
         Msg::logMsg(DARK_GREY, CONSOLE_OUTPUT, "Connexion with client : %d closed", client_fd);
         printf("4\n");
-        //all_client_fd.erase(all_client_fd.begin() + (pos - all_serv_fd.size()));
+        all_client_fd.erase(all_client_fd.begin() + (pos - all_serv_fd.size()));
         printf("5\n");
-        //poll_fds.erase(poll_fds.begin() + pos);
+        poll_fds.erase(poll_fds.begin() + pos);
         printf("6\n");
-        //Reqmap.erase(client_fd);
+        Reqmap.erase(client_fd);
         printf("7\n");
-        //TimeOutMap.erase(client_fd);
+        TimeOutMap.erase(client_fd);
         printf("8\n");
         close(client_fd);
     }
@@ -437,7 +437,7 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
 
 void Server::handleDelete(int client_fd, const std::string& file_path) {
     std::string response;
-    if (remove(file_path.c_str()) == 0) {
+    if (std::remove(file_path.c_str()) == 0) {
         response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
                    "File deleted successfully";
     } else {
@@ -445,6 +445,5 @@ void Server::handleDelete(int client_fd, const std::string& file_path) {
                    "File not found";
     }
     send(client_fd, response.c_str(), response.size(), 0);
-    printf("1\n");
     close_connexion(client_fd, client_fd - all_serv_fd.size());
 }
