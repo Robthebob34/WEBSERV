@@ -24,10 +24,10 @@ void    Msg::logMsg(const char *color, Mode m, const char *msg, ...)
                 return ;
             }
             int fd = open(("logs/" + file_name).c_str(), O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR); // S_IRUSR | S_IWUSR option de permission en cas de creation du fichier avec 0_CREAT
-            write(fd, date.c_str(), date.length());
-            write(fd, "   ", 3);
-            write(fd, output, n);
-            write(fd, "\n", 1);
+            // write(fd, date.c_str(), date.length());
+            // write(fd, "   ", 3);
+            // write(fd, output, n);
+            // write(fd, "\n", 1);
             close(fd);
         }
         else if (m == CONSOLE_OUTPUT)

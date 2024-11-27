@@ -90,13 +90,21 @@ void    Server::Check_TimeOut()
 
 void    Server::close_connexion(int client_fd, size_t pos)
 {
+    printf("2\n");
+    (void) pos;
     if(std::find(all_client_fd.begin(), all_client_fd.end(), client_fd) != all_client_fd.end())
     {
+        printf("3\n");
         Msg::logMsg(DARK_GREY, CONSOLE_OUTPUT, "Connexion with client : %d closed", client_fd);
-        all_client_fd.erase(all_client_fd.begin() + (pos - all_serv_fd.size()));
-        poll_fds.erase(poll_fds.begin() + pos);
-        Reqmap.erase(client_fd);
-        TimeOutMap.erase(client_fd);
+        printf("4\n");
+        //all_client_fd.erase(all_client_fd.begin() + (pos - all_serv_fd.size()));
+        printf("5\n");
+        //poll_fds.erase(poll_fds.begin() + pos);
+        printf("6\n");
+        //Reqmap.erase(client_fd);
+        printf("7\n");
+        //TimeOutMap.erase(client_fd);
+        printf("8\n");
         close(client_fd);
     }
 }
@@ -249,6 +257,7 @@ void Server::readrequest(int client_fd, size_t pos) {
     (void)pos;
     std::vector<unsigned char> fileContent = receiveData(client_fd);
     std::string fileContentAsString(fileContent.begin(), fileContent.end());
+    printf("%s\n", fileContentAsString.c_str());
     TimeOutMap[client_fd] = time(NULL);
     std::string method, path, connexion;
     size_t method_end = fileContentAsString.find(' ');
@@ -271,16 +280,21 @@ void Server::readrequest(int client_fd, size_t pos) {
             FilePath = getFilePath(path);
         } else if (method == "POST") {
             FilePath = path;
+            printf("file path : %s\n", FilePath.c_str());
         } else if (method == "DELETE") {
-           FilePath = getFilePath(path);
+            size_t filename_begin = fileContentAsString.find("delete/");
+            filename_begin += 7;
+            size_t end_file_name = fileContentAsString.find("HTTP/1.1", filename_begin);
+            std::string file_name = fileContentAsString.substr(filename_begin, end_file_name - filename_begin - 1);
+            std::string file_path = "./uploads/" +  file_name;
+            FilePath = file_path;
         }
         Reqmap[client_fd].setFilePath(FilePath);
 }
 
 std::string Server::getFilePath(const std::string& request_path) {
-    std::string base_directory = "./www";
+    std::string base_directory = "./uploads";
     std::string file_path = base_directory + request_path;
-    if (file_path.back() == '/') file_path += "index.html";
     return file_path;
 }
 std::string trim_cgi_param(std::string str)
@@ -400,6 +414,7 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
             // Get the file content
             size_t file_start = content_disposition_end + 4; // Skip "\r\n"
             std::string file_path = "./uploads/" +  file_name; // Adjust path as necessary
+            printf("file_path : %s\n", file_path.c_str());
             int f = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
             data[data.size() -1] = 0;
             unsigned char *l = reinterpret_cast<unsigned char*>(&data[file_start]);
@@ -422,7 +437,6 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
 
 void Server::handleDelete(int client_fd, const std::string& file_path) {
     std::string response;
-    printf("file path : |%s|\n", file_path.c_str());
     if (remove(file_path.c_str()) == 0) {
         response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
                    "File deleted successfully";
@@ -431,5 +445,6 @@ void Server::handleDelete(int client_fd, const std::string& file_path) {
                    "File not found";
     }
     send(client_fd, response.c_str(), response.size(), 0);
+    printf("1\n");
     close_connexion(client_fd, client_fd - all_serv_fd.size());
 }
