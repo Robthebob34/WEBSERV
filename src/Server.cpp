@@ -68,8 +68,6 @@ const std::string Server::find_err_path(int serv_fd, int err_code)
 
 void    Server::add_serv(ServerConfig newServ)
 {
-   //hostname = newServ.hostname;
-   //port = newServ.port;
    (void)port;
     all_hostname.push_back(newServ.hostname);
     all_port.push_back(newServ.port);
@@ -92,11 +90,6 @@ void    Server::Check_TimeOut()
 
 void    Server::close_connexion(int client_fd, size_t pos)
 {
-   //std::cout << "size of client = " << all_client_fd.size() << std::endl;
-    for(size_t i = 0; i < all_client_fd.size(); i++)
-    {
-       // std::cout << all_client_fd[i] << std::endl;
-    }
     if(std::find(all_client_fd.begin(), all_client_fd.end(), client_fd) != all_client_fd.end())
     {
         Msg::logMsg(DARK_GREY, CONSOLE_OUTPUT, "Connexion with client : %d closed", client_fd);
@@ -131,7 +124,6 @@ bool Server::makeNonBlocking() {
 }
 
 void Server::start() {
-     // << "AMOUNT OF SERV = " << amount_of_serv << std::endl;
     for(size_t i = 0; i < amount_of_serv ; i++)
     {
         if (listen(all_serv_fd[i], SOMAXCONN) < 0) {
@@ -192,7 +184,6 @@ void Server::acceptConnections() {
         for(size_t i = 0; i < poll_fds.size(); i++)
         {
             int fd = poll_fds[i].fd;
-            //std::cout << "THIS IS MY FD ; " << fd << std::endl;
             Msg::logMsg(RED, FILE_OUTPUT, "Revent for fd : %d  = %d and ERRNO = %d ", fd, poll_fds[i].revents, strerror(errno));
             if (poll_fds[i].revents & POLLHUP)
                 close_connexion(fd, i);
@@ -227,13 +218,10 @@ void Server::acceptConnections() {
                         handlePost(fd, Reqmap[fd].request, Reqmap[fd].FilePath, Reqmap[fd].bytes_read, Reqmap[fd].data);
                     } else if (method == "DELETE") {
                         handleDelete(fd, Reqmap[fd].FilePath);
-                    }// else
-                     //   send404(fd);
+                    }
                 }
-                //close(fd); // implementer une fonction update time qui regarder les timeout
             }
         }
-        //Check_TimeOut();
         if(!running)
             break;
     }
@@ -242,19 +230,16 @@ void Server::acceptConnections() {
 }
 
 std::vector<unsigned char> Server::receiveData(int sockfd) {
+
     const size_t bufferSize = 4096;
     std::vector<unsigned char> data;
     unsigned char buffer[bufferSize];
 
     ssize_t bytesRead;
-    while ((bytesRead = recv(sockfd, buffer, bufferSize, 0)) > 0) {
+    while ((bytesRead = recv(sockfd, buffer, bufferSize, 0)) > 0)
         data.insert(data.end(), buffer, buffer + bytesRead);
-    }
-
-    if (bytesRead == -1) {
-        perror("recv ");
-    }
-
+    // if (bytesRead == -1)
+    //     perror("recv ");
     return data;
 }
 
@@ -262,18 +247,8 @@ std::vector<unsigned char> Server::receiveData(int sockfd) {
 void Server::readrequest(int client_fd, size_t pos) {
 
     (void)pos;
-    //char buffer[10240];
     std::vector<unsigned char> fileContent = receiveData(client_fd);
     std::string fileContentAsString(fileContent.begin(), fileContent.end());
-    std::cout << "File Content:\n" << fileContentAsString << std::endl;
-    std::cout << "File Content ENDDDDDDDDDDDDDDD\n"  << std::endl;
-    // memset(buffer, 0, sizeof(buffer));
-    // ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-    // if (bytes_read <= 0) {
-    //     close_connexion(client_fd, pos);
-    //     std::cerr << "Error: Failed to read from client." << std::endl;
-    //     return;
-    // }
     TimeOutMap[client_fd] = time(NULL);
     std::string method, path, connexion;
     size_t method_end = fileContentAsString.find(' ');
@@ -286,22 +261,18 @@ void Server::readrequest(int client_fd, size_t pos) {
     }
         size_t connexion_pos = fileContentAsString.find("Connection:");
         size_t Referer_pos = fileContentAsString.find("Referer");
-       // std::cout << Referer_pos << std::endl << connexion_pos << std::endl << Referer_pos - connexion_pos << std::endl;
         connexion = fileContentAsString.substr(connexion_pos + 11 , Referer_pos - connexion_pos);
         Reqmap[client_fd].setConnexion(connexion);
         Reqmap[client_fd].method = method;
         Reqmap[client_fd].request = fileContentAsString;
         Reqmap[client_fd].data = fileContent;
-       // Reqmap[client_fd].bytes_read = bytes_read;
-        //Reqmap[client_fd].buffer = buffer;
-       // printf("fileContentAsString :%s\nEND\n", buffer);
         std::string FilePath;
         if (method == "GET") {
             FilePath = getFilePath(path);
         } else if (method == "POST") {
-            FilePath = path; // New function for handling POST requests
+            FilePath = path;
         } else if (method == "DELETE") {
-           FilePath = getFilePath(path); // New function for handling DELETE requests
+           FilePath = getFilePath(path);
         }
         Reqmap[client_fd].setFilePath(FilePath);
 }
@@ -327,10 +298,8 @@ std::string trim_cgi_param(std::string str)
 void Server::serveFile(int client_fd, const std::string& file_path, size_t pos) {
     std::string real_file_path = trim_cgi_param(file_path);
     std::ifstream file(real_file_path.c_str(), std::ios::in | std::ios::binary);
-    if (!file.is_open()) {
-        //send404(client_fd);
+    if (!file.is_open())
         return;
-    }
     bool is_cgi = false;
     std::string file_content;
     file.close();
@@ -360,10 +329,7 @@ void Server::serveFile(int client_fd, const std::string& file_path, size_t pos) 
     
     send(client_fd, http_response.c_str(), http_response.size(), 0);
     if(Reqmap[client_fd].connexion == "close")
-    {
-        //std::cout << "HAAAAAAAAAAAAAAAAAA" << Reqmap[client_fd].connexion << std::endl;
         close_connexion(client_fd, pos);
-    }
     else
         TimeOutMap[client_fd] = time(NULL);
     close_connexion(client_fd, pos);
@@ -400,16 +366,8 @@ void Server::send404(int client_fd) {
 
 void Server::handlePost(int client_fd, const std::string& request, const std::string& path, size_t request_length, std::vector<unsigned char> data)
 {
-    printf("REQUEST :%s\nEND\n", request.c_str());
     (void) path;
-    size_t content_length = 0;
-    size_t pos = request.find("Content-Length: ");
-    if (pos != std::string::npos) {
-        pos += 16; // Length of "Content-Length: "
-        size_t end_pos = request.find("\r\n", pos);
-        content_length = std::stoul(request.substr(pos, end_pos - pos));
-    }
-
+    (void) request_length;
     size_t boundary_start = request.find("boundary=") + 9;
     size_t boundary_end = request.find("C", boundary_start) - 1; // Find the end of the boundary
     std::string boundary;
@@ -425,7 +383,6 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
     start += boundary.length();
     while (start != std::string::npos) {
         size_t end = request.find(boundary, start);
-        printf("Boundary : |%s|\n", boundary.c_str());
         size_t content_disposition_start = request.find("Content-Disposition:", 0);
         if (content_disposition_start == std::string::npos || content_disposition_start >= end) {
             std::cerr << "Error: Content-Disposition not found." << std::endl;
@@ -443,40 +400,11 @@ void Server::handlePost(int client_fd, const std::string& request, const std::st
             // Get the file content
             size_t file_start = content_disposition_end + 4; // Skip "\r\n"
             std::string file_path = "./uploads/" +  file_name; // Adjust path as necessary
-            //std::ofstream out_file(file_path, std::ios::binary);
-           int f = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            printf("valeur open :%d\n", f);
-            // if (!out_file) {
-            //     std::cerr << "Error: Unable to open file for writing." << std::endl;
-            //     sendInvalidUploadResponse(client_fd);
-            //     return;
-            // }
-           // printf("buffer : |%s|\n boundary size : %lu \nrequest length : %lu\n file start : %lu content length : %lu \n\n", buffer, boundary.size(), request_length ,file_start, content_length);
-            //std::cout << "buffer cpp :" << buffer  << std::endl;
-           // printf("size buffer :%lu\n",strlen(buffer + 1360));
-            //out_file.write(buffer + file_start, request_length - file_start - boundary.size());
-            (void) data;
-            (void) request_length;
-            printf("size %lu\n", request.size());
-            printf("data . size : %lu", data.size());
-            printf("file start : %lu", file_start);
-             if (file_start >= data.size()) {
-                std::cerr << "Invalid file_start index." << std::endl;
-                    return;
-             }
-             data[data.size() -1] = 0;
-            printf("CAST :%s\n", reinterpret_cast<unsigned char*>(&data[file_start]));
+            int f = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            data[data.size() -1] = 0;
             unsigned char *l = reinterpret_cast<unsigned char*>(&data[file_start]);
-            //out_file.write(request.c_str(), request_length - file_start - boundary.size());
-            //write(f, request.c_str()[],request.size());
-             //write(f, "123456789098",12);
-            printf("content lengthj %lu\n", content_length);
             for (size_t i = 0; i < data.size() - file_start - (boundary.size() + 4); i++)
                 write(f, &l[i], 1);
-
-            //write(f,l, request_length - file_start - boundary.size());
-            //out_file.close();
-
             // Respond back to the client
             std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
                                    "File uploaded successfully";
